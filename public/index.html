@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <!-- חשוב למובייל: גורם לדף להתאים את עצמו לרוחב המסך במקום "להתכווץ" -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>מעקב קלוריות</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <main class="container">
+    <header>
+      <h1>🍎 מעקב קלוריות</h1>
+      <p id="today-date" class="date"></p>
+    </header>
+
+    <!-- מסך 1: הגדרת היעד היומי (מוצג כשעוד לא הוגדר יעד להיום) -->
+    <section id="goal-screen" class="card hidden">
+      <h2>בוקר טוב! ☀️</h2>
+      <p>מה יעד הקלוריות שלך להיום?</p>
+      <form id="goal-form">
+        <input type="number" id="goal-input" min="1" inputmode="numeric" placeholder="למשל 1800" required>
+        <button type="submit">יאללה, מתחילים</button>
+      </form>
+    </section>
+
+    <!-- מסך 2: המסך הראשי של היום -->
+    <section id="main-screen" class="hidden">
+      <div class="card summary">
+        <div class="remaining">
+          <span id="remaining-number" class="big-number">0</span>
+          <span id="remaining-label">קלוריות נשארו</span>
+        </div>
+        <div class="progress">
+          <div id="progress-bar" class="progress-bar"></div>
+        </div>
+        <div class="summary-row">
+          <span>אכלת: <strong id="eaten-number">0</strong></span>
+          <span>יעד: <strong id="goal-number">0</strong>
+            <button id="edit-goal" class="link-button" type="button">שינוי</button>
+          </span>
+        </div>
+      </div>
+
+      <div class="card">
+        <h2>מה אכלת?</h2>
+        <form id="food-form">
+          <input type="text" id="food-name" placeholder="למשל: 2 פרוסות לחם עם גבינה וקפה" maxlength="500" required>
+          <!-- לא חובה: אם ריק, ה-AI יחשב את הקלוריות -->
+          <input type="number" id="food-calories" min="0" inputmode="numeric" placeholder="קלוריות (לא חובה, אחרת ה-AI יחשב)">
+          <button type="submit" id="food-submit">הוספה</button>
+        </form>
+        <p id="food-error" class="error hidden"></p>
+        <p class="muted hint">אפשר ללחוץ על מספר הקלוריות של פריט כדי לתקן אותו</p>
+      </div>
+
+      <div class="card">
+        <h2>היום אכלת</h2>
+        <ul id="food-list"></ul>
+        <p id="empty-message" class="muted">עוד לא נרשם כלום היום</p>
+        <button id="clear-day">נקה את היום</button>
+      </div>
+    </section>
+  </main>
+
+  <script src="app.js"></script>
+</body>
+</html>

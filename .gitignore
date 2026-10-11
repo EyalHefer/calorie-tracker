@@ -1,0 +1,4 @@
+node_modules/
+.wrangler/
+# הקובץ עם מפתח ה-API: אסור שיגיע ל-Git
+.dev.vars

@@ -1,0 +1,12 @@
+// הגדרות של Cloudflare Workers. הכלי wrangler קורא את הקובץ הזה.
+{
+  "name": "calorie-tracker",
+  // הקובץ שמכיל את קוד השרת
+  "main": "src/worker.js",
+  // "גרסת" סביבת הריצה, כדי ששינויים עתידיים של Cloudflare לא ישברו לנו את הקוד
+  "compatibility_date": "2025-10-01",
+  // התיקייה שהקבצים שלה מוגשים כמו שהם לדפדפן
+  "assets": {
+    "directory": "./public"
+  }
+}
