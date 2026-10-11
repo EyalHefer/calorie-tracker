@@ -5,6 +5,10 @@
   "main": "src/worker.js",
   // "גרסת" סביבת הריצה, כדי ששינויים עתידיים של Cloudflare לא ישברו לנו את הקוד
   "compatibility_date": "2025-10-01",
+  // הכתובת הציבורית calorie-tracker.eyal-hefer.workers.dev
+  "workers_dev": true,
+  // כתובות תצוגה מקדימה לכל גרסה: לא צריך, ועדיף פחות כתובות ציבוריות לאתר
+  "preview_urls": false,
   // התיקייה שהקבצים שלה מוגשים כמו שהם לדפדפן
   "assets": {
     "directory": "./public"
