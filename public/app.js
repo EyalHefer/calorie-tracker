@@ -471,3 +471,22 @@ document.getElementById("back-to-today").addEventListener("click", () => selectD
 
 render();
 resumePendingItems();
+
+// כשהאינטרנט חוזר, מנסים שוב את מה שנכשל (למשל פריט שהוזן בלי קליטה)
+window.addEventListener("online", () => {
+  for (const [key, day] of Object.entries(loadAllDays())) {
+    for (const item of day.items) {
+      if (item.status === "failed") {
+        item.status = "pending";
+        saveDay(key, day);
+        resolveItem(key, item.id, item.name);
+      }
+    }
+  }
+  render();
+});
+
+// רישום ה-Service Worker (public/sw.js). דפדפנים ישנים בלי תמיכה פשוט ידלגו.
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/sw.js");
+}
