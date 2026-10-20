@@ -189,9 +189,20 @@ button:active {
   text-decoration: underline dotted;
 }
 
-.error {
+/* פריט שה-AI עוד מחשב: מהבהב בעדינות כדי שיהיה ברור שמשהו קורה */
+.food-calories.pending {
+  text-decoration: none;
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.4;
+  }
+}
+
+.food-calories.failed {
   color: var(--over);
-  margin: 10px 0 0;
 }
 
 .hint {
@@ -200,8 +211,155 @@ button:active {
 }
 
 button:disabled {
-  opacity: 0.6;
-  cursor: wait;
+  opacity: 0.3;
+  cursor: default;
+}
+
+/* ===== ניווט בין ימים ===== */
+.day-nav {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+}
+
+.nav-button {
+  background: var(--card);
+  color: var(--text);
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+}
+
+.day-nav .date {
+  min-width: 150px;
+}
+
+/* ===== הסיכום השבועי ===== */
+.stats {
+  display: flex;
+  gap: 12px;
+}
+
+.stat {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 12px;
+  background: var(--bg);
+}
+
+.stat-label {
+  color: var(--muted);
+  font-size: 0.85rem;
+}
+
+.stat-value {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+/* ===== גרף העמודות ===== */
+.chart {
+  display: flex;
+  gap: 2px;
+  margin-top: 16px;
+  /* קו בסיס דק אחד, בלי רשת: המספרים המדויקים נמצאים בלחיצה על היום */
+  border-bottom: 1px solid var(--border);
+}
+
+.bar-slot {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  color: var(--muted);
+  padding: 0 0 6px;
+  border-radius: 8px;
+  font-weight: normal;
+}
+
+.bar-slot.selected {
+  background: var(--bg);
+  color: var(--text);
+  font-weight: 600;
+}
+
+.bar-area {
+  position: relative;
+  width: 100%;
+  height: 140px;
+  /* מקום למספר שמעל העמודה הכי גבוהה */
+  margin-top: 20px;
+}
+
+/* עמודה דקה (עד 24px) עם קצה עליון מעוגל ובסיס ישר */
+.bar {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  max-width: 24px;
+  background: var(--primary);
+  border-radius: 4px 4px 0 0;
+}
+
+/* סימון היעד: קו קצר בצבע טקסט, כדי שיובחן מהעמודה גם בלי להסתמך על צבע */
+.goal-mark {
+  position: absolute;
+  left: 50%;
+  transform: translate(-50%, 1px);
+  width: 85%;
+  max-width: 34px;
+  height: 2px;
+  background: var(--text);
+  border-radius: 1px;
+}
+
+.bar-value {
+  position: absolute;
+  left: 0;
+  right: 0;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.bar-label {
+  font-size: 0.85rem;
+}
+
+.chart-key {
+  font-size: 0.85rem;
+  margin-top: 10px;
+}
+
+.key-bar,
+.key-goal {
+  display: inline-block;
+  vertical-align: middle;
+  margin-inline-start: 6px;
+}
+
+.key-bar {
+  width: 8px;
+  height: 12px;
+  background: var(--primary);
+  border-radius: 2px 2px 0 0;
+}
+
+.key-goal {
+  width: 14px;
+  height: 2px;
+  background: var(--text);
 }
 
 .delete-button {

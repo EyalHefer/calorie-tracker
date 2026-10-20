@@ -8,11 +8,14 @@
 // והקוד כאן רץ רק לכתובות שאין להן קובץ, כמו /api/estimate.
 // =====================================================================
 
-// רשימת מודלים לפי סדר עדיפות. אם מודל עמוס (503), חרג ממכסה (429) או הוסר (404),
-// מנסים את הבא. גוגל מחליפה מודלים לעיתים קרובות, ולכן כדאי לא להיות תלויים באחד.
+// רשימת מודלים לפי סדר עדיפות. אם מודל עמוס (503), חרג ממכסה (429), הוסר (404)
+// או לא ענה בזמן, מנסים את הבא. גוגל מחליפה מודלים לעיתים קרובות, ולכן כדאי לא להיות תלויים באחד.
 // המודלים עם "latest" הם כינויים שגוגל מעדכנת לבד למודל העדכני.
-const MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-flash-lite-latest"];
+// מודלי ה-lite ראשונים: במדידות הם ענו הכי מהר, וההערכה שלהם מספיק טובה לקלוריות.
+const MODELS = ["gemini-3.5-flash-lite", "gemini-flash-lite-latest", "gemini-3.8-flash", "gemini-flash-latest"];
 const RETRYABLE_STATUSES = [404, 429, 503];
+// בשכבה החינמית מודל עמוס יכול "להיתקע" גם דקה ויותר, אז לא מחכים לו יותר מזה
+const ATTEMPT_TIMEOUT_MS = 15000;
 
 function geminiUrl(model) {
   return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`;
@@ -90,21 +93,29 @@ async function handleEstimate(request, env) {
 // המפתח מגיע מ-env (מהקובץ .dev.vars או מההגדרות ב-Cloudflare), ולא כתוב בקוד עצמו.
 async function callGeminiWithFallback(text, apiKey) {
   for (const model of MODELS) {
-    const response = await fetch(geminiUrl(model), {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "x-goog-api-key": apiKey,
-      },
-      body: JSON.stringify({
-        systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-        contents: [{ parts: [{ text }] }],
-        generationConfig: {
-          responseMimeType: "application/json",
-          responseSchema: RESPONSE_SCHEMA,
+    let response;
+    try {
+      response = await fetch(geminiUrl(model), {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": apiKey,
         },
-      }),
-    });
+        body: JSON.stringify({
+          systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
+          contents: [{ parts: [{ text }] }],
+          generationConfig: {
+            responseMimeType: "application/json",
+            responseSchema: RESPONSE_SCHEMA,
+          },
+        }),
+        // מבטל את הבקשה אוטומטית אם עבר הזמן (ואז fetch זורק שגיאה)
+        signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
+      });
+    } catch (error) {
+      console.error(`Gemini timeout or network error (${model}):`, error.name);
+      continue;
+    }
 
     if (response.ok) {
       return response;

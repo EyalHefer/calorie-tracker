@@ -11,20 +11,26 @@
   <main class="container">
     <header>
       <h1>🍎 מעקב קלוריות</h1>
-      <p id="today-date" class="date"></p>
+      <!-- ניווט בין ימים. בעברית "קודם" הוא ימינה, ולכן החץ לאתמול הוא → -->
+      <nav class="day-nav">
+        <button id="prev-day" class="nav-button" type="button" aria-label="יום קודם">→</button>
+        <p id="selected-date" class="date"></p>
+        <button id="next-day" class="nav-button" type="button" aria-label="יום הבא">←</button>
+      </nav>
+      <button id="back-to-today" class="link-button hidden" type="button">חזרה להיום</button>
     </header>
 
-    <!-- מסך 1: הגדרת היעד היומי (מוצג כשעוד לא הוגדר יעד להיום) -->
+    <!-- מסך 1: הגדרת היעד (מוצג כשעוד לא הוגדר יעד ליום שנבחר) -->
     <section id="goal-screen" class="card hidden">
-      <h2>בוקר טוב! ☀️</h2>
-      <p>מה יעד הקלוריות שלך להיום?</p>
+      <h2 id="goal-title">בוקר טוב! ☀️</h2>
+      <p id="goal-question">מה יעד הקלוריות שלך להיום?</p>
       <form id="goal-form">
         <input type="number" id="goal-input" min="1" inputmode="numeric" placeholder="למשל 1800" required>
         <button type="submit">יאללה, מתחילים</button>
       </form>
     </section>
 
-    <!-- מסך 2: המסך הראשי של היום -->
+    <!-- מסך 2: המסך הראשי של היום שנבחר -->
     <section id="main-screen" class="hidden">
       <div class="card summary">
         <div class="remaining">
@@ -46,20 +52,42 @@
         <h2>מה אכלת?</h2>
         <form id="food-form">
           <input type="text" id="food-name" placeholder="למשל: 2 פרוסות לחם עם גבינה וקפה" maxlength="500" required>
-          <!-- לא חובה: אם ריק, ה-AI יחשב את הקלוריות -->
+          <!-- לא חובה: אם ריק, ה-AI יחשב את הקלוריות ברקע -->
           <input type="number" id="food-calories" min="0" inputmode="numeric" placeholder="קלוריות (לא חובה, אחרת ה-AI יחשב)">
-          <button type="submit" id="food-submit">הוספה</button>
+          <button type="submit">הוספה</button>
         </form>
-        <p id="food-error" class="error hidden"></p>
         <p class="muted hint">אפשר ללחוץ על מספר הקלוריות של פריט כדי לתקן אותו</p>
       </div>
 
       <div class="card">
-        <h2>היום אכלת</h2>
+        <h2 id="list-title">היום אכלת</h2>
         <ul id="food-list"></ul>
-        <p id="empty-message" class="muted">עוד לא נרשם כלום היום</p>
-        <button id="clear-day">נקה את היום</button>
+        <p id="empty-message" class="muted">עוד לא נרשם כלום</p>
+        <button id="clear-day" type="button">נקה את היום</button>
       </div>
+    </section>
+
+    <!-- סיכום שבועי: מוצג רק כשיש נתונים מימים קודמים -->
+    <section id="week-card" class="card hidden">
+      <h2>7 הימים האחרונים</h2>
+      <div class="stats">
+        <div class="stat">
+          <span class="stat-label">ממוצע יומי</span>
+          <span id="stat-average" class="stat-value"></span>
+        </div>
+        <div class="stat">
+          <span id="stat-balance-label" class="stat-label">יתרה מול היעד</span>
+          <span id="stat-balance" class="stat-value"></span>
+        </div>
+      </div>
+      <p id="stats-note" class="muted hint"></p>
+
+      <div id="week-chart" class="chart"></div>
+      <p class="chart-key muted">
+        <span class="key-bar"></span> מה שאכלת
+        <span class="key-goal"></span> היעד
+        · לחיצה על יום פותחת אותו
+      </p>
     </section>
   </main>
 
