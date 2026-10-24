@@ -4,10 +4,16 @@
 //
 // מבנה הנתונים שנשמר:
 // {
-//   "2026-10-08": { goal: 1800, items: [ { id: "...", name: "לחם", calories: 150 } ] },
+//   "2026-10-08": {
+//     goal: 1800, proteinGoal: 90,
+//     items: [ { id: "...", name: "לחם", calories: 150, protein: 5 } ]
+//   },
 //   "2026-10-09": { ... }
 // }
 // כל יום נשמר לפי התאריך שלו, ככה בכל יום חדש מתחילים מאפס ושומרים היסטוריה.
+//
+// ימים ופריטים שנשמרו לפני שהוספנו חלבון: אין להם proteinGoal / protein.
+// לא הופכים את זה ל-0, כי "לא ידוע" ו"אפס חלבון" זה לא אותו דבר.
 //
 // לפריט יכול להיות גם status:
 //   "pending" - ה-AI עוד מחשב (נשמר, כדי שאם יוצאים מהאתר החישוב ימשיך כשחוזרים)
@@ -83,11 +89,27 @@ function totalCalories(day) {
   return day.items.reduce((sum, item) => sum + item.calories, 0);
 }
 
-// היעד האחרון שהוגדר, כדי למלא אותו מראש ולחסוך הקלדה
-function lastGoal() {
+// סכום החלבון של הפריטים שיש להם נתון. typeof בודק שהשדה קיים ושהוא מספר.
+function totalProtein(day) {
+  return day.items.reduce((sum, item) => sum + (typeof item.protein === "number" ? item.protein : 0), 0);
+}
+
+// פריט שהחישוב שלו הסתיים, אבל אין לו נתון חלבון (פריט ישן, או הזנה ידנית בלי חלבון)
+function hasUnknownProtein(item) {
+  return !item.status && typeof item.protein !== "number";
+}
+
+// עיגול לספרה אחת אחרי הנקודה, ובלי ".0" מיותר (12.0 → 12)
+function formatGrams(grams) {
+  return String(Math.round(grams * 10) / 10);
+}
+
+// היעד האחרון שהוגדר (לפי שם השדה: goal או proteinGoal), כדי למלא אותו מראש ולחסוך הקלדה
+function lastGoal(field) {
   const days = loadAllDays();
   const keys = Object.keys(days).sort().reverse();
-  return keys.length > 0 ? days[keys[0]].goal : "";
+  const key = keys.find((key) => days[key][field]);
+  return key ? days[key][field] : "";
 }
 
 // ---------- הפניות לאלמנטים ב-HTML ----------
@@ -96,9 +118,11 @@ const goalScreen = document.getElementById("goal-screen");
 const mainScreen = document.getElementById("main-screen");
 const goalForm = document.getElementById("goal-form");
 const goalInput = document.getElementById("goal-input");
+const proteinGoalInput = document.getElementById("protein-goal-input");
 const foodForm = document.getElementById("food-form");
 const foodNameInput = document.getElementById("food-name");
 const foodCaloriesInput = document.getElementById("food-calories");
+const foodProteinInput = document.getElementById("food-protein");
 const foodList = document.getElementById("food-list");
 const emptyMessage = document.getElementById("empty-message");
 const weekCard = document.getElementById("week-card");
@@ -119,9 +143,10 @@ function render() {
   if (!day) {
     document.getElementById("goal-title").textContent = isToday ? "בוקר טוב! ☀️" : "לא נרשם כלום ביום הזה";
     document.getElementById("goal-question").textContent = isToday
-      ? "מה יעד הקלוריות שלך להיום?"
-      : "מה היה היעד באותו יום?";
-    goalInput.value = lastGoal();
+      ? "מה היעדים שלך להיום?"
+      : "מה היו היעדים באותו יום?";
+    goalInput.value = lastGoal("goal");
+    proteinGoalInput.value = lastGoal("proteinGoal");
     goalScreen.classList.remove("hidden");
     mainScreen.classList.add("hidden");
     return;
@@ -143,9 +168,24 @@ function render() {
   document.getElementById("progress-bar").style.width = percent + "%";
   document.querySelector(".summary").classList.toggle("over", remaining < 0);
 
+  renderProtein(day);
+
   document.getElementById("list-title").textContent = isToday ? "היום אכלת" : "ביום הזה אכלת";
   document.getElementById("clear-day").textContent = isToday ? "נקה את היום" : "נקה את היום הזה";
   renderFoodList(day.items);
+}
+
+function renderProtein(day) {
+  const eaten = totalProtein(day);
+  document.getElementById("protein-eaten").textContent = formatGrams(eaten);
+  // יום ישן בלי יעד חלבון: מציגים "—" במקום מספר, ואפשר להגדיר עם "שינוי"
+  document.getElementById("protein-goal").textContent = day.proteinGoal || "—";
+
+  // בחלבון אין "חריגה" כמו בקלוריות (הרבה חלבון זה לא רע), אז הפס פשוט נעצר ב-100%
+  const percent = day.proteinGoal ? Math.min((eaten / day.proteinGoal) * 100, 100) : 0;
+  document.getElementById("protein-bar").style.width = percent + "%";
+
+  document.getElementById("protein-unknown").classList.toggle("hidden", !day.items.some(hasUnknownProtein));
 }
 
 function renderDayNav(isToday) {
@@ -206,12 +246,18 @@ function renderCalories(item) {
   }
 
   button.className = "food-calories";
-  button.textContent = item.calories + " קק\"ל";
+  const protein = typeof item.protein === "number" ? formatGrams(item.protein) : "?";
+  button.textContent = `${item.calories} קק"ל · ${protein} ג' חלבון`;
   button.addEventListener("click", () => {
     const newCalories = prompt(`כמה קלוריות יש ב"${item.name}"?`, item.calories);
-    if (newCalories !== null && newCalories !== "" && Number(newCalories) >= 0) {
-      updateItemCalories(item.id, Number(newCalories));
+    // null = לחצו "ביטול": עוצרים בלי לשנות כלום
+    if (newCalories === null || newCalories === "" || !(Number(newCalories) >= 0)) {
+      return;
     }
+    const newProtein = prompt(`וכמה גרם חלבון?`, typeof item.protein === "number" ? item.protein : "");
+    // ביטול או שדה ריק בחלבון: משאירים את מה שהיה
+    const protein = newProtein !== null && newProtein !== "" && Number(newProtein) >= 0 ? Number(newProtein) : item.protein;
+    updateItem(item.id, Number(newCalories), protein);
   });
   return button;
 }
@@ -241,6 +287,11 @@ function renderWeek() {
   document.getElementById("stat-average").textContent = Math.round(totalEaten / pastDays.length).toLocaleString("he-IL");
   document.getElementById("stat-balance").textContent = Math.abs(balance).toLocaleString("he-IL");
   document.getElementById("stat-balance-label").textContent = balance >= 0 ? "נשארו מתחת ליעד" : "מעל היעד";
+  // ממוצע חלבון רק מימים שבהם כבר עקבו אחרי חלבון (יש להם יעד), אחרת הממוצע יירד בגלל ימים ישנים
+  const proteinDays = pastDays.filter((day) => day.proteinGoal);
+  document.getElementById("stat-protein").textContent = proteinDays.length
+    ? Math.round(proteinDays.reduce((sum, day) => sum + totalProtein(day), 0) / proteinDays.length) + " ג'"
+    : "—";
   document.getElementById("stats-note").textContent =
     `לפי ${pastDays.length === 1 ? "יום אחד קודם" : pastDays.length + " ימים קודמים"} שנרשמו (בלי היום)`;
 
@@ -312,20 +363,23 @@ function selectDay(key) {
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
 
-function setGoal(goal) {
+// מקבלת אובייקט עם היעדים שמשתנים, למשל { goal: 1800 } או { goal: 1800, proteinGoal: 90 }
+function setGoals(goals) {
   // אם כבר יש נתונים ליום (למשל כשמשנים יעד), שומרים על הפריטים הקיימים
   const day = getDay(selectedKey) || { goal: 0, items: [] };
-  day.goal = goal;
+  // Object.assign מעתיק את השדות מ-goals לתוך day, ומשאיר את השאר כמו שהם
+  Object.assign(day, goals);
   saveDay(selectedKey, day);
   render();
 }
 
-function addItem(name, calories) {
+// protein יכול להיות undefined (לא הוזן). JSON.stringify פשוט לא שומר שדה כזה.
+function addItem(name, calories, protein) {
   const day = getDay(selectedKey);
   // crypto.randomUUID() יוצר מזהה ייחודי אקראי.
   // (קודם השתמשנו ב-Date.now(), אבל כשמוסיפים כמה פריטים באותה מילישנייה
   // הם היו מקבלים את אותו מזהה, ומחיקה של אחד הייתה מוחקת את כולם)
-  day.items.push({ id: crypto.randomUUID(), name, calories });
+  day.items.push({ id: crypto.randomUUID(), name, calories, protein });
   saveDay(selectedKey, day);
   render();
 }
@@ -362,7 +416,7 @@ async function resolveItem(dayKey, id, text) {
 
   if (result && result.length > 0) {
     // מחליפים את הפריט הממתין בפריטים שה-AI החזיר, באותו מקום ברשימה
-    const newItems = result.map(({ name, calories }) => ({ id: crypto.randomUUID(), name, calories }));
+    const newItems = result.map(({ name, calories, protein }) => ({ id: crypto.randomUUID(), name, calories, protein }));
     day.items.splice(index, 1, ...newItems);
   } else {
     day.items[index].status = "failed";
@@ -392,10 +446,11 @@ function resumePendingItems() {
   }
 }
 
-function updateItemCalories(id, calories) {
+function updateItem(id, calories, protein) {
   const day = getDay(selectedKey);
   const item = day.items.find((item) => item.id === id);
   item.calories = calories;
+  item.protein = protein;
   saveDay(selectedKey, day);
   render();
 }
@@ -434,17 +489,18 @@ function clearDay() {
 goalForm.addEventListener("submit", (event) => {
   // ברירת המחדל של טופס היא לטעון את הדף מחדש, ואת זה אנחנו לא רוצים
   event.preventDefault();
-  setGoal(Number(goalInput.value));
-  goalInput.value = "";
+  setGoals({ goal: Number(goalInput.value), proteinGoal: Number(proteinGoalInput.value) });
+  goalForm.reset();
 });
 
 foodForm.addEventListener("submit", (event) => {
   event.preventDefault();
   const name = foodNameInput.value.trim();
 
-  // הוזנו קלוריות ידנית: מוסיפים ישר. אחרת: ה-AI מחשב ברקע.
+  // הוזנו קלוריות ידנית: מוסיפים ישר (חלבון לא חובה). אחרת: ה-AI מחשב ברקע.
   if (foodCaloriesInput.value !== "") {
-    addItem(name, Number(foodCaloriesInput.value));
+    const protein = foodProteinInput.value !== "" ? Number(foodProteinInput.value) : undefined;
+    addItem(name, Number(foodCaloriesInput.value), protein);
   } else {
     addItemWithAI(name);
   }
@@ -453,9 +509,17 @@ foodForm.addEventListener("submit", (event) => {
 });
 
 document.getElementById("edit-goal").addEventListener("click", () => {
-  const newGoal = prompt("מה היעד החדש ליום הזה?", getDay(selectedKey).goal);
+  const newGoal = prompt("מה יעד הקלוריות החדש ליום הזה?", getDay(selectedKey).goal);
   if (newGoal && Number(newGoal) > 0) {
-    setGoal(Number(newGoal));
+    setGoals({ goal: Number(newGoal) });
+  }
+});
+
+document.getElementById("edit-protein-goal").addEventListener("click", () => {
+  const day = getDay(selectedKey);
+  const newGoal = prompt("מה יעד החלבון (בגרמים) ליום הזה?", day.proteinGoal || lastGoal("proteinGoal"));
+  if (newGoal && Number(newGoal) > 0) {
+    setGoals({ proteinGoal: Number(newGoal) });
   }
 });
 
