@@ -1,4 +1,17 @@
 [
-  { "name": "חביתה מ-2 ביצים", "calories": 180, "protein": 12 },
-  { "name": "סלט ירקות עם כף שמן זית", "calories": 130, "protein": 2 }
+  { "type": "meal", "name": "חביתה מ-2 ביצים", "calories": 180, "protein": 12 },
+  { "type": "side", "name": "סלט ירקות עם כף שמן זית", "calories": 130, "protein": 2 },
+  { "type": "side", "name": "פחית טונה במים", "calories": 100, "protein": 25 },
+  { "type": "side", "name": "פיתה קלה", "calories": 100, "protein": 1 },
+  { "type": "side", "name": "חמש כפות קוטג'", "calories": 100, "protein": 12 },
+  { "type": "side", "name": "חצי אבוקדו", "calories": 130, "protein": 2 },
+  { "type": "meal", "name": "חמישה ספרינג רולס מדפי אורז, עם מילוי של טופו וירקות ורוטב של חמאת בוטנים וסויה", "calories": 850, "protein": 40 },
+  { "type": "meal", "name": "שקשוקה עם שתי ביצים", "calories": 320, "protein": 16 },
+  { "type": "meal", "name": "סלט ביצים: ביצים קשות עם מיונז ומלפפון חמוץ", "calories": 250, "protein": 13 },
+  { "type": "meal", "name": "האנדרול סושי שמורכב משתי אצות, פחית טונה במים וסריראצ'ה מיונז קל וירקות", "calories": 300, "protein": 30 },
+  { "type": "snack", "name": "במבה קטנה", "calories": 130, "protein": 4 },
+  { "type": "snack", "name": "חטיף אצות", "calories": 30, "protein": 1 },
+  { "type": "snack", "name": "פרכיות טעימות", "calories": 130, "protein": 2 },
+  { "type": "snack", "name": "תפוח", "calories": 90, "protein": 0 },
+  { "type": "snack", "name": "ארבע כפות קוואקר עם בננה", "calories": 240, "protein": 6 }
 ]

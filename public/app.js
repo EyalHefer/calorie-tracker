@@ -20,6 +20,9 @@
 //   "failed"  - החישוב נכשל, ואפשר לנסות שוב
 // =====================================================================
 
+// import עובד כי app.js נטען כ-module (ראה index.html). זה אותו קובץ שהבדיקות בודקות.
+import { suggestMeals } from "./suggest.js";
+
 const STORAGE_KEY = "calorie-tracker-days";
 
 // היום "מתחלף" ב-4 בבוקר ולא בחצות, כדי שמה שנאכל ב-1 בלילה ייספר ליום שעבר
@@ -127,6 +130,10 @@ const foodList = document.getElementById("food-list");
 const emptyMessage = document.getElementById("empty-message");
 const weekCard = document.getElementById("week-card");
 const weekChart = document.getElementById("week-chart");
+const suggestCard = document.getElementById("suggest-card");
+const suggestButton = document.getElementById("suggest-button");
+const suggestMessage = document.getElementById("suggest-message");
+const suggestList = document.getElementById("suggest-list");
 
 // ---------- ציור המסך (render) ----------
 // העיקרון: הנתונים הם "מקור האמת". אחרי כל שינוי שומרים ואז מציירים מחדש
@@ -169,6 +176,7 @@ function render() {
   document.querySelector(".summary").classList.toggle("over", remaining < 0);
 
   renderProtein(day);
+  renderSuggestions(day, remaining, isToday);
 
   document.getElementById("list-title").textContent = isToday ? "היום אכלת" : "ביום הזה אכלת";
   document.getElementById("clear-day").textContent = isToday ? "נקה את היום" : "נקה את היום הזה";
@@ -260,6 +268,74 @@ function renderCalories(item) {
     updateItem(item.id, Number(newCalories), protein);
   });
   return button;
+}
+
+// ---------- הצעות: מה עוד אפשר לאכול ----------
+
+// מאגר המאכלים נטען מהשרת רק בפעם הראשונה שלוחצים על הכפתור, ואז נשמר כאן
+let foodsCache = null;
+// האם רשימת ההצעות פתוחה. כשהיא פתוחה, render מחשב אותה מחדש אחרי כל שינוי,
+// כך שאם פריט "מחשב..." מסתיים, ההצעות מתעדכנות לבד.
+let suggestionsOpen = false;
+
+async function loadFoods() {
+  if (!foodsCache) {
+    const response = await fetch("/foods.json");
+    if (!response.ok) {
+      throw new Error("foods.json לא נטען");
+    }
+    foodsCache = await response.json();
+  }
+  return foodsCache;
+}
+
+function renderSuggestions(day, remaining, isToday) {
+  // הצעות רק להיום (לא אוכלים אתמול), ורק כשבאמת נשארו קלוריות
+  suggestCard.classList.toggle("hidden", !isToday || remaining <= 0);
+  suggestButton.textContent = suggestionsOpen ? "הסתרת ההצעות" : "💡 מה עוד אפשר לאכול?";
+  suggestList.innerHTML = "";
+  suggestMessage.classList.add("hidden");
+
+  if (!suggestionsOpen || !foodsCache) {
+    return;
+  }
+
+  // יום ישן בלי יעד חלבון: מחשבים כאילו החלבון כבר הושלם, ואז רק הקלוריות קובעות
+  const remainingProtein = day.proteinGoal ? day.proteinGoal - totalProtein(day) : 0;
+  const suggestions = suggestMeals(remaining, remainingProtein, foodsCache);
+
+  if (suggestions.length === 0) {
+    showSuggestMessage(`לא מצאתי במאגר משהו שנכנס ב-${remaining} קלוריות`);
+  } else if (day.items.some((item) => item.status === "pending")) {
+    // לפריט שעוד מחושב יש 0 קלוריות, אז מה ש"נשאר" כרגע גדול מהאמת
+    showSuggestMessage("יש פריטים שעוד מחושבים, אז ההצעות יתעדכנו בעוד רגע");
+  }
+
+  for (const suggestion of suggestions) {
+    const li = document.createElement("li");
+
+    const names = document.createElement("span");
+    names.className = "suggest-names";
+    names.textContent = suggestion.foods.map((food) => food.name).join(" + ");
+
+    const totals = document.createElement("span");
+    totals.className = "muted";
+    totals.textContent = `${suggestion.calories} קק"ל · ${formatGrams(suggestion.protein)} ג' חלבון`;
+
+    const addButton = document.createElement("button");
+    addButton.type = "button";
+    addButton.className = "link-button";
+    addButton.textContent = "אכלתי את זה";
+    addButton.addEventListener("click", () => addFoods(suggestion.foods));
+
+    li.append(names, totals, addButton);
+    suggestList.append(li);
+  }
+}
+
+function showSuggestMessage(text) {
+  suggestMessage.textContent = text;
+  suggestMessage.classList.remove("hidden");
 }
 
 // ---------- הסיכום השבועי והגרף ----------
@@ -359,6 +435,7 @@ function renderChart(keys, days) {
 
 function selectDay(key) {
   selectedKey = key;
+  suggestionsOpen = false;
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -381,6 +458,17 @@ function addItem(name, calories, protein) {
   // הם היו מקבלים את אותו מזהה, ומחיקה של אחד הייתה מוחקת את כולם)
   day.items.push({ id: crypto.randomUUID(), name, calories, protein });
   saveDay(selectedKey, day);
+  render();
+}
+
+// מוסיפה כמה מאכלים מהמאגר בבת אחת (מהצעה), ושומרת פעם אחת בסוף
+function addFoods(foods) {
+  const day = getDay(selectedKey);
+  for (const food of foods) {
+    day.items.push({ id: crypto.randomUUID(), name: food.name, calories: food.calories, protein: food.protein });
+  }
+  saveDay(selectedKey, day);
+  suggestionsOpen = false;
   render();
 }
 
@@ -525,6 +613,22 @@ document.getElementById("edit-protein-goal").addEventListener("click", () => {
 
 document.getElementById("clear-day").addEventListener("click", () => {
   clearDay();
+});
+
+suggestButton.addEventListener("click", async () => {
+  if (suggestionsOpen) {
+    suggestionsOpen = false;
+    render();
+    return;
+  }
+  try {
+    await loadFoods();
+  } catch {
+    showSuggestMessage("לא הצלחתי לטעון את מאגר המאכלים");
+    return;
+  }
+  suggestionsOpen = true;
+  render();
 });
 
 document.getElementById("prev-day").addEventListener("click", () => selectDay(addDays(selectedKey, -1)));

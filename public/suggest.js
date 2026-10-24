@@ -1,14 +1,4 @@
-// =====================================================================
-// הצעות להשלמת היום: התרגיל שלך 💪
-//
-// הפונקציה מקבלת כמה קלוריות וחלבון נשארו עד היעד, ואת מאגר המאכלים (foods.json),
-// ומחזירה את ההצעות הכי טובות למה עוד אפשר לאכול.
-//
-// לכל מאכל במאגר יש type:
-//   "meal"  - ארוחה (שקשוקה, ספרינג רולס)
-//   "side"  - תוספת שאוכלים עם ארוחה (פיתה, סלט, חצי אבוקדו)
-//   "snack" - נשנוש (פרי, פריכיות, חטיף אצות)
-//
+
 // מבנה של הצעה:
 //   - ארוחה אחת בדיוק
 //   - ועוד 0 או 1 תוספת
@@ -54,6 +44,88 @@
  *   ההצעות הכי טובות. foods הם המאכלים בהצעה, calories ו-protein הם הסכומים שלהם.
  */
 export function suggestMeals(remainingCalories, remainingProtein, foods, { maxSnacks = 2, count = 3 } = {}) {
-  // TODO: הקוד שלך כאן
-  return [];
+  // שלב 1: חלוקה לפי type
+  const meals = foods.filter((food) => food.type === "meal");
+  const sides = foods.filter((food) => food.type === "side");
+  const snacks = foods.filter((food) => food.type === "snack");
+
+  // שלב 2: כל הצירופים האפשריים.
+  // null ברשימת התוספות מייצג "בלי תוספת", ו-[] ברשימת הנשנושים מייצג "בלי נשנוש",
+  // ככה שלוש לולאות פשוטות מכסות גם את המקרים שבהם חסר חלק.
+  const sideOptions = [null, ...sides];
+  const snackOptions = snackGroups(snacks, maxSnacks);
+
+  let combos = [];
+  for (const meal of meals) {
+    for (const side of sideOptions) {
+      for (const group of snackOptions) {
+        const items = side ? [meal, side, ...group] : [meal, ...group];
+        combos.push(makeCombo(items));
+      }
+    }
+  }
+
+  // שלב 3: רק מה שנכנס בקלוריות שנשארו
+  combos = combos.filter((combo) => combo.calories <= remainingCalories);
+
+  // שלב 4: אף ארוחה לא נכנסה, אז רק נשנושים (בלי הקבוצה הריקה)
+  if (combos.length === 0) {
+    combos = snackOptions
+      .filter((group) => group.length > 0)
+      .map(makeCombo)
+      .filter((combo) => combo.calories <= remainingCalories);
+  }
+
+  // שלב 5: מיון מהציון הגבוה לנמוך, ולוקחים את count הראשונות
+  combos.sort((a, b) => score(b, remainingCalories, remainingProtein) - score(a, remainingCalories, remainingProtein));
+  return combos.slice(0, count);
+}
+
+// כל קבוצות הנשנושים בגודל 0 עד maxSnacks (עד 2).
+// j מתחיל מ-i + 1, ולכן כל זוג נוצר פעם אחת בלבד: [תפוח, פריכיות] כן, [פריכיות, תפוח] לא.
+function snackGroups(snacks, maxSnacks) {
+  const groups = [[]];
+  if (maxSnacks >= 1) {
+    for (const snack of snacks) {
+      groups.push([snack]);
+    }
+  }
+  if (maxSnacks >= 2) {
+    for (let i = 0; i < snacks.length; i++) {
+      for (let j = i + 1; j < snacks.length; j++) {
+        groups.push([snacks[i], snacks[j]]);
+      }
+    }
+  }
+  return groups;
+}
+
+// הופכת רשימת מאכלים להצעה עם הסכומים
+function makeCombo(items) {
+  return {
+    foods: items,
+    calories: items.reduce((sum, food) => sum + food.calories, 0),
+    protein: items.reduce((sum, food) => sum + food.protein, 0),
+  };
+}
+
+// ציון גבוה = הצעה טובה יותר
+function score(combo, remainingCalories, remainingProtein) {
+  let finalScore = 0;
+
+  // 1. השלמת יעד החלבון (הכי חשוב) - משקל גבוה לכל גרם שסוגר את הפער
+  if (remainingProtein > 0) {
+    const usefulProtein = Math.min(combo.protein, remainingProtein);
+    finalScore += usefulProtein * 50; 
+  }
+
+  // 2. ניצול קלוריות - כדי שהיא באמת תשבע ולא תקבל מנה של 150 כשיש לה 600 קלוריות פנויות.
+  // (היות והמערך כבר סונן בשלב 3, אנחנו בטוחים שהקלוריות לא חורגות מהיעד).
+  finalScore += combo.calories;
+
+  // 3. איכות המנה (רלוונטי תמיד, גם אם remainingProtein <= 0) - בונוס קטן ליחס חלבון-לקלוריה
+  const proteinDensity = (combo.protein / Math.max(combo.calories, 1)) * 100;
+  finalScore += proteinDensity;
+
+  return finalScore;
 }
