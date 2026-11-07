@@ -450,3 +450,27 @@ label {
 .suggest-names {
   font-weight: 600;
 }
+
+/* בחירה בין ארוחה לנשנוש: שני כפתורים זה לצד זה, והנבחר מודגש */
+.suggest-kinds:not(.hidden) {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.suggest-kinds .hint {
+  width: 100%;
+  margin: 0;
+}
+
+.suggest-kinds button {
+  flex: 1;
+  background: var(--bg);
+  color: var(--primary);
+  border: 2px solid transparent;
+}
+
+.suggest-kinds button.selected {
+  border-color: var(--primary);
+}

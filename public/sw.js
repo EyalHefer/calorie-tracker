@@ -8,7 +8,7 @@
 // היתרון: אחרי deploy ליאור מקבלת מיד את הגרסה החדשה, ולא גרסה ישנה מהמטמון.
 // =====================================================================
 
-const CACHE_NAME = "calorie-tracker-v2";
+const CACHE_NAME = "calorie-tracker-v3";
 
 // הקבצים שהאתר צריך כדי לעלות. שומרים אותם כבר בהתקנה, כדי שיעבוד אופליין מהרגע הראשון.
 const APP_FILES = ["/", "/style.css", "/app.js", "/suggest.js", "/foods.json", "/manifest.webmanifest", "/icons/icon.svg", "/icons/icon-192.png"];

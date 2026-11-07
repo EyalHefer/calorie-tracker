@@ -77,6 +77,11 @@
       <!-- הצעות מהמאגר (foods.json): מוצג רק היום, וכשנשארו קלוריות -->
       <div id="suggest-card" class="card">
         <button id="suggest-button" class="secondary-button" type="button">💡 מה עוד אפשר לאכול?</button>
+        <div id="suggest-kinds" class="suggest-kinds hidden">
+          <p class="muted hint">מה בא לך עכשיו?</p>
+          <button type="button" data-kind="meal">🍽️ ארוחה</button>
+          <button type="button" data-kind="snack">🍿 נשנוש</button>
+        </div>
         <p id="suggest-message" class="muted hint hidden"></p>
         <ul id="suggest-list"></ul>
       </div>

@@ -21,7 +21,7 @@
 // =====================================================================
 
 // import עובד כי app.js נטען כ-module (ראה index.html). זה אותו קובץ שהבדיקות בודקות.
-import { suggestMeals } from "./suggest.js";
+import { suggest } from "./suggest.js";
 
 const STORAGE_KEY = "calorie-tracker-days";
 
@@ -132,6 +132,7 @@ const weekCard = document.getElementById("week-card");
 const weekChart = document.getElementById("week-chart");
 const suggestCard = document.getElementById("suggest-card");
 const suggestButton = document.getElementById("suggest-button");
+const suggestKinds = document.getElementById("suggest-kinds");
 const suggestMessage = document.getElementById("suggest-message");
 const suggestList = document.getElementById("suggest-list");
 
@@ -277,6 +278,15 @@ let foodsCache = null;
 // האם רשימת ההצעות פתוחה. כשהיא פתוחה, render מחשב אותה מחדש אחרי כל שינוי,
 // כך שאם פריט "מחשב..." מסתיים, ההצעות מתעדכנות לבד.
 let suggestionsOpen = false;
+// מה בא לה עכשיו: "meal" או "snack". null = עוד לא בחרה.
+let suggestKind = null;
+
+const KIND_LABEL = { meal: "ארוחה", snack: "נשנוש" };
+
+function closeSuggestions() {
+  suggestionsOpen = false;
+  suggestKind = null;
+}
 
 async function loadFoods() {
   if (!foodsCache) {
@@ -295,17 +305,22 @@ function renderSuggestions(day, remaining, isToday) {
   suggestButton.textContent = suggestionsOpen ? "הסתרת ההצעות" : "💡 מה עוד אפשר לאכול?";
   suggestList.innerHTML = "";
   suggestMessage.classList.add("hidden");
+  suggestKinds.classList.toggle("hidden", !suggestionsOpen);
+  for (const button of suggestKinds.querySelectorAll("button")) {
+    button.classList.toggle("selected", button.dataset.kind === suggestKind);
+  }
 
-  if (!suggestionsOpen || !foodsCache) {
+  if (!suggestionsOpen || !foodsCache || !suggestKind) {
     return;
   }
 
   // יום ישן בלי יעד חלבון: מחשבים כאילו החלבון כבר הושלם, ואז רק הקלוריות קובעות
   const remainingProtein = day.proteinGoal ? day.proteinGoal - totalProtein(day) : 0;
-  const suggestions = suggestMeals(remaining, remainingProtein, foodsCache);
+  const suggestions = suggest(suggestKind, remaining, remainingProtein, foodsCache);
 
   if (suggestions.length === 0) {
-    showSuggestMessage(`לא מצאתי במאגר משהו שנכנס ב-${remaining} קלוריות`);
+    const tip = suggestKind === "meal" ? ", אולי נשנוש?" : "";
+    showSuggestMessage(`לא מצאתי ${KIND_LABEL[suggestKind]} שנכנס ב-${remaining} קלוריות${tip}`);
   } else if (day.items.some((item) => item.status === "pending")) {
     // לפריט שעוד מחושב יש 0 קלוריות, אז מה ש"נשאר" כרגע גדול מהאמת
     showSuggestMessage("יש פריטים שעוד מחושבים, אז ההצעות יתעדכנו בעוד רגע");
@@ -435,7 +450,7 @@ function renderChart(keys, days) {
 
 function selectDay(key) {
   selectedKey = key;
-  suggestionsOpen = false;
+  closeSuggestions();
   render();
   window.scrollTo({ top: 0, behavior: "smooth" });
 }
@@ -468,7 +483,7 @@ function addFoods(foods) {
     day.items.push({ id: crypto.randomUUID(), name: food.name, calories: food.calories, protein: food.protein });
   }
   saveDay(selectedKey, day);
-  suggestionsOpen = false;
+  closeSuggestions();
   render();
 }
 
@@ -617,7 +632,7 @@ document.getElementById("clear-day").addEventListener("click", () => {
 
 suggestButton.addEventListener("click", async () => {
   if (suggestionsOpen) {
-    suggestionsOpen = false;
+    closeSuggestions();
     render();
     return;
   }
@@ -630,6 +645,14 @@ suggestButton.addEventListener("click", async () => {
   suggestionsOpen = true;
   render();
 });
+
+// בחירה בין ארוחה לנשנוש. לחיצה שוב על אותה בחירה לא משנה כלום.
+for (const button of suggestKinds.querySelectorAll("button")) {
+  button.addEventListener("click", () => {
+    suggestKind = button.dataset.kind;
+    render();
+  });
+}
 
 document.getElementById("prev-day").addEventListener("click", () => selectDay(addDays(selectedKey, -1)));
 document.getElementById("next-day").addEventListener("click", () => selectDay(addDays(selectedKey, 1)));
