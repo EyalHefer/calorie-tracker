@@ -98,6 +98,28 @@
           <button type="submit">הוספה</button>
         </form>
         <p class="muted hint">אם משאירים את הקלוריות ריקות, ה-AI יחשב קלוריות וחלבון. לחיצה על הערכים של פריט מאפשרת לתקן אותם.</p>
+
+        <!-- הוספה מתמונה (public/photo.js). בטלפון, בחירת קובץ מציעה לצלם או לבחור מהגלריה -->
+        <label for="photo-input" class="secondary-button photo-button">📷 או צלמי את הצלחת</label>
+        <input type="file" id="photo-input" accept="image/*" class="hidden">
+        <div id="photo-panel" class="photo-panel hidden">
+          <img id="photo-preview" class="photo-preview" alt="התמונה שנבחרה">
+          <input type="text" id="photo-note" maxlength="500" placeholder="הערה, לא חובה (למשל: אכלתי חצי)">
+          <p id="photo-message" class="muted hint hidden" role="status"></p>
+          <div id="photo-actions" class="input-row">
+            <button id="photo-analyze" type="button">🔍 זיהוי</button>
+            <button class="photo-cancel secondary-button" type="button">ביטול</button>
+          </div>
+          <div id="photo-review" class="hidden">
+            <p class="muted hint">זה מה שזיהיתי. אפשר לתקן לפני ההוספה:</p>
+            <ul id="photo-items"></ul>
+            <p id="photo-total" class="photo-total"></p>
+            <div class="input-row">
+              <button id="photo-confirm" type="button">הוספה ליום</button>
+              <button class="photo-cancel secondary-button" type="button">ביטול</button>
+            </div>
+          </div>
+        </div>
       </div>
 
       <div class="card">

@@ -1,7 +1,7 @@
 // =====================================================================
 // צד השרת: Cloudflare Worker
 // הקוד הזה רץ בשרתים של Cloudflare ולא בדפדפן, ולכן מותר לו להחזיק את מפתח ה-API.
-// הדפדפן שולח לכאן את הטקסט ("מה אכלתי"), אנחנו מעבירים אותו ל-Gemini
+// הדפדפן שולח לכאן טקסט ("מה אכלתי") ו/או תמונה של האוכל, אנחנו מעבירים אותם ל-Gemini
 // ומחזירים לדפדפן רשימת פריטים עם קלוריות.
 //
 // קבצים סטטיים (index.html, style.css, app.js) מוגשים אוטומטית מתיקיית public,
@@ -26,6 +26,19 @@ const INSTRUCTIONS = `אתה עוזר תזונה. המשתמשת תתאר בעב
 פרק את התיאור לפריטי מזון נפרדים והערך כמה קלוריות וכמה גרם חלבון יש בכל פריט.
 אם לא צוינה כמות, הנח מנה סטנדרטית ומקובלת בישראל.
 כתוב את שם כל פריט בעברית, כולל הכמות שהנחת (למשל "2 פרוסות לחם מלא").`;
+
+// תוספת להוראות כשמגיעה תמונה. מתמונה קשה לדעת כמויות, אז מבקשים מהמודל
+// להיעזר בגודל הצלחת והכלים, ולהעדיף את מה שהמשתמשת כתבה על פני מה שנראה.
+const IMAGE_INSTRUCTIONS = `
+לפעמים תקבל תמונה של האוכל. זהה את המאכלים שבתמונה והערך את הכמות לפי גודל הצלחת, הכלים והפרופורציות.
+אם יש גם טקסט, הוא מדויק יותר מהתמונה: השתמש בו כדי לתקן את הזיהוי או את הכמות.
+אם אין בתמונה אוכל, החזר רשימה ריקה.`;
+
+// מגבלות קלט. הדפדפן מקטין את התמונה לפני השליחה (בערך 200KB),
+// אז המגבלה כאן נדיבה ורק מגינה מפני בקשות ענקיות.
+const MAX_TEXT_LENGTH = 500;
+const MAX_IMAGE_BASE64_LENGTH = 2_000_000; // בערך 1.5MB של תמונה
+const IMAGE_TYPES = ["image/jpeg", "image/png", "image/webp"];
 
 // סכמה (Schema) שמכריחה את המודל להחזיר JSON במבנה קבוע,
 // כדי שהקוד שלנו יוכל לסמוך על המבנה במקום לנחש איך התשובה תיראה.
@@ -64,18 +77,19 @@ export default {
 
 async function handleEstimate(request, env) {
   // 1. בדיקת הקלט: אף פעם לא סומכים על מה שמגיע מהדפדפן
-  let text;
+  let body;
   try {
-    ({ text } = await request.json());
+    body = await request.json();
   } catch {
     return jsonResponse({ error: "הבקשה לא תקינה" }, 400);
   }
-  if (typeof text !== "string" || !text.trim() || text.length > 500) {
-    return jsonResponse({ error: "צריך לכתוב תיאור של עד 500 תווים" }, 400);
+  const input = validateInput(body);
+  if (input.error) {
+    return jsonResponse({ error: input.error }, 400);
   }
 
   // 2. שליחה ל-Gemini, עם מעבר למודל הבא ברשימה אם יש תקלה זמנית
-  const geminiResponse = await callGeminiWithFallback(text, env.GEMINI_API_KEY);
+  const geminiResponse = await callGeminiWithFallback(buildRequest(input), env.GEMINI_API_KEY);
   if (!geminiResponse) {
     return jsonResponse({ error: "שירות ה-AI לא זמין כרגע, נסי שוב עוד מעט" }, 502);
   }
@@ -91,9 +105,55 @@ async function handleEstimate(request, env) {
   }
 }
 
+// הקלט יכול להיות טקסט, תמונה, או שניהם, אבל לפחות אחד מהם.
+// מחזירה { text, image } נקיים, או { error } עם הודעה למשתמשת.
+function validateInput(body) {
+  const text = typeof body?.text === "string" ? body.text.trim() : "";
+  if (text.length > MAX_TEXT_LENGTH) {
+    return { error: `צריך לכתוב תיאור של עד ${MAX_TEXT_LENGTH} תווים` };
+  }
+
+  let image = null;
+  if (body?.image !== undefined) {
+    const { mimeType, data } = body.image || {};
+    // base64 מכיל רק את התווים האלה. בודקים כדי לא להעביר זבל לגוגל.
+    if (!IMAGE_TYPES.includes(mimeType) || typeof data !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(data)) {
+      return { error: "התמונה לא תקינה" };
+    }
+    if (data.length > MAX_IMAGE_BASE64_LENGTH) {
+      return { error: "התמונה גדולה מדי" };
+    }
+    image = { mimeType, data };
+  }
+
+  if (!text && !image) {
+    return { error: "צריך לכתוב מה אכלת או לצרף תמונה" };
+  }
+  return { text, image };
+}
+
+// בונה את גוף הבקשה ל-Gemini. כל "part" הוא חלק בהודעה: טקסט, או תמונה (inlineData).
+function buildRequest({ text, image }) {
+  const parts = [];
+  if (image) {
+    parts.push({ inlineData: image });
+  }
+  if (text) {
+    parts.push({ text });
+  }
+  return {
+    systemInstruction: { parts: [{ text: image ? INSTRUCTIONS + IMAGE_INSTRUCTIONS : INSTRUCTIONS }] },
+    contents: [{ parts }],
+    generationConfig: {
+      responseMimeType: "application/json",
+      responseSchema: RESPONSE_SCHEMA,
+    },
+  };
+}
+
 // מחזירה את התשובה הראשונה שהצליחה, או null אם כל המודלים נכשלו.
 // המפתח מגיע מ-env (מהקובץ .dev.vars או מההגדרות ב-Cloudflare), ולא כתוב בקוד עצמו.
-async function callGeminiWithFallback(text, apiKey) {
+async function callGeminiWithFallback(requestBody, apiKey) {
   for (const model of MODELS) {
     let response;
     try {
@@ -103,14 +163,7 @@ async function callGeminiWithFallback(text, apiKey) {
           "Content-Type": "application/json",
           "x-goog-api-key": apiKey,
         },
-        body: JSON.stringify({
-          systemInstruction: { parts: [{ text: INSTRUCTIONS }] },
-          contents: [{ parts: [{ text }] }],
-          generationConfig: {
-            responseMimeType: "application/json",
-            responseSchema: RESPONSE_SCHEMA,
-          },
-        }),
+        body: JSON.stringify(requestBody),
         // מבטל את הבקשה אוטומטית אם עבר הזמן (ואז fetch זורק שגיאה)
         signal: AbortSignal.timeout(ATTEMPT_TIMEOUT_MS),
       });

@@ -22,6 +22,7 @@
 
 // import עובד כי app.js נטען כ-module (ראה index.html). זה אותו קובץ שהבדיקות בודקות.
 import { suggest } from "./suggest.js";
+import { initPhoto } from "./photo.js";
 
 const STORAGE_KEY = "calorie-tracker-days";
 
@@ -476,15 +477,19 @@ function addItem(name, calories, protein) {
   render();
 }
 
-// מוסיפה כמה מאכלים מהמאגר בבת אחת (מהצעה), ושומרת פעם אחת בסוף
-function addFoods(foods) {
+// מוסיפה כמה פריטים בבת אחת ושומרת פעם אחת בסוף (מהצעה, או מתמונה שאושרה)
+function addItems(items) {
   const day = getDay(selectedKey);
-  for (const food of foods) {
-    day.items.push({ id: crypto.randomUUID(), name: food.name, calories: food.calories, protein: food.protein });
+  for (const { name, calories, protein } of items) {
+    day.items.push({ id: crypto.randomUUID(), name, calories, protein });
   }
   saveDay(selectedKey, day);
-  closeSuggestions();
   render();
+}
+
+function addFoods(foods) {
+  closeSuggestions();
+  addItems(foods);
 }
 
 // מוסיפה פריט "בהמתנה" מיד, ומפעילה את ה-AI ברקע בלי לחכות לו.
@@ -504,7 +509,7 @@ function addItemWithAI(text) {
 async function resolveItem(dayKey, id, text) {
   let result;
   try {
-    result = await estimateCalories(text);
+    result = await estimateCalories({ text });
   } catch {
     result = null;
   }
@@ -558,13 +563,14 @@ function updateItem(id, calories, protein) {
   render();
 }
 
-// שולחת את התיאור לשרת שלנו (src/worker.js), שמעביר אותו ל-Gemini.
+// שולחת את התיאור (ואולי תמונה) לשרת שלנו (src/worker.js), שמעביר אותם ל-Gemini.
+// input הוא { text } או { text, image }.
 // async/await: הבקשה לוקחת זמן, ו-await "מחכה" לתשובה בלי לתקוע את הדף.
-async function estimateCalories(text) {
+async function estimateCalories(input) {
   const response = await fetch("/api/estimate", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(input),
   });
   const data = await response.json();
   if (!response.ok) {
@@ -662,6 +668,7 @@ document.getElementById("back-to-today").addEventListener("click", () => selectD
 
 render();
 resumePendingItems();
+initPhoto({ estimate: estimateCalories, onAdd: addItems });
 
 // כשהאינטרנט חוזר, מנסים שוב את מה שנכשל (למשל פריט שהוזן בלי קליטה)
 window.addEventListener("online", () => {
